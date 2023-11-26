@@ -1,0 +1,108 @@
+db.customer.aggregate([
+  {
+    $match: {
+      c_mktsegment: "FURNITURE",
+    },
+  },
+  {
+    $lookup: {
+      from: "order",
+      let: {
+        custkey: "$c_custkey",
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $and: [
+                {
+                  $eq: [
+                    "$o_custkey",
+                    "$$custkey",
+                  ],
+                },
+                {
+                  $lt: [
+                    "$o_orderdate",
+                    new Date("1995-03-29"),
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: "lineitem",
+            let: {
+              orderkey: "$o_orderkey",
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      {
+                        $eq: [
+                          "$l_orderkey",
+                          "$$orderkey",
+                        ],
+                      },
+                      {
+                        $gt: [
+                          "$l_shipdate",
+                          new Date("1995-03-29"),
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            as: "lineitemData",
+          },
+        },
+      ],
+      as: "orderData",
+    },
+  },
+  {
+    $unwind: "$orderData",
+  },
+  {
+    $unwind: "$orderData.lineitemData",
+  },
+  {
+    $group: {
+      _id: {
+        l_orderkey:
+          "$orderData.lineitemData.l_orderkey",
+        o_orderdate: "$orderData.o_orderdate",
+        o_shippriority:
+          "$orderData.o_shippriority",
+      },
+      revenue: {
+        $sum: {
+          $multiply: [
+            "$orderData.lineitemData.l_extendedprice",
+            {
+              $subtract: [
+                1,
+                "$orderData.lineitemData.l_discount",
+              ],
+            },
+          ],
+        },
+      },
+    },
+  },
+  {
+    $sort: {
+      revenue: -1,
+      "_id.o_orderdate": 1,
+    },
+  },
+  {
+    $limit: 10,
+  },
+]);

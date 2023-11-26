@@ -1,0 +1,133 @@
+db.lineitem.aggregate([
+  {
+    $match: {
+      l_shipmode: {
+        $in: ["AIR", "AIR REG"],
+      },
+      l_shipinstruct: "DELIVER IN PERSON",
+      l_quantity: {
+        $gte: 8,
+        $lte: 34,
+      }, // Adjusted to cover all quantity ranges in your conditions
+    },
+  },
+  {
+    $lookup: {
+      from: "part",
+      localField: "l_partkey",
+      foreignField: "p_partkey",
+      as: "partDetails",
+    },
+  },
+  {
+    $unwind: "$partDetails",
+  },
+  {
+    $match: {
+      $or: [
+        {
+          $and: [
+            {
+              "partDetails.p_brand": "Brand#22",
+            },
+            {
+              "partDetails.p_container": {
+                $in: [
+                  "SM CASE",
+                  "SM BOX",
+                  "SM PACK",
+                  "SM PKG",
+                ],
+              },
+            },
+            {
+              l_quantity: {
+                $gte: 8,
+                $lte: 18,
+              },
+            },
+            {
+              "partDetails.p_size": {
+                $gte: 1,
+                $lte: 5,
+              },
+            },
+          ],
+        },
+        {
+          $and: [
+            {
+              "partDetails.p_brand": "Brand#23",
+            },
+            {
+              "partDetails.p_container": {
+                $in: [
+                  "MED BAG",
+                  "MED BOX",
+                  "MED PKG",
+                  "MED PACK",
+                ],
+              },
+            },
+            {
+              l_quantity: {
+                $gte: 10,
+                $lte: 20,
+              },
+            },
+            {
+              "partDetails.p_size": {
+                $gte: 1,
+                $lte: 10,
+              },
+            },
+          ],
+        },
+        {
+          $and: [
+            {
+              "partDetails.p_brand": "Brand#12",
+            },
+            {
+              "partDetails.p_container": {
+                $in: [
+                  "LG CASE",
+                  "LG BOX",
+                  "LG PACK",
+                  "LG PKG",
+                ],
+              },
+            },
+            {
+              l_quantity: {
+                $gte: 24,
+                $lte: 34,
+              },
+            },
+            {
+              "partDetails.p_size": {
+                $gte: 1,
+                $lte: 15,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      revenue: {
+        $sum: {
+          $multiply: [
+            "$l_extendedprice",
+            {
+              $subtract: [1, "$l_discount"],
+            },
+          ],
+        },
+      },
+    },
+  },
+]);

@@ -1,0 +1,97 @@
+db.partsupp.agregate([
+  {
+    $lookup: {
+      from: "part",
+      localField: "ps_partkey",
+      foreignField: "p_partkey",
+      as: "part",
+    },
+  },
+  {
+    $unwind: "$part",
+  },
+  {
+    $match: {
+      "part.p_brand": {
+        $ne: "Brand#45",
+      },
+      "part.p_type": {
+        $not: /^SMALL PLATED/,
+      },
+      "part.p_size": {
+        $in: [19, 17, 16, 23, 10, 4, 38, 11],
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "supplier",
+      pipeline: [
+        {
+          $match: {
+            s_comment: /Customer.*Complaints/,
+          },
+        },
+        {
+          $project: {
+            s_suppkey: 1,
+          },
+        },
+      ],
+      as: "excluded_suppliers",
+    },
+  },
+  {
+    $addFields: {
+      excluded_suppkey_list: {
+        $map: {
+          input: "$excluded_suppliers",
+          as: "supplier",
+          in: "$$supplier.s_suppkey",
+        },
+      },
+    },
+  },
+  {
+    $match: {
+      $expr: {
+        $not: {
+          $in: [
+            "$ps_suppkey",
+            "$excluded_suppkey_list",
+          ],
+        },
+      },
+    },
+  },
+  {
+    $group: {
+      _id: {
+        p_brand: "$part.p_brand",
+        p_type: "$part.p_type",
+        p_size: "$part.p_size",
+      },
+      supplier_cnt: {
+        $addToSet: "$ps_suppkey",
+      },
+    },
+  },
+  {
+    $project: {
+      p_brand: "$_id.p_brand",
+      p_type: "$_id.p_type",
+      p_size: "$_id.p_size",
+      supplier_cnt: {
+        $size: "$supplier_cnt",
+      },
+    },
+  },
+  {
+    $sort: {
+      supplier_cnt: -1,
+      p_brand: 1,
+      p_type: 1,
+      p_size: 1,
+    },
+  },
+]);

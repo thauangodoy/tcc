@@ -1,0 +1,41 @@
+db.lineitem.aggregate([
+  {
+    $match: {
+      l_shipdate: {
+        $gte: ISODate("1994-01-01"),
+      },
+      $expr: {
+        $lt: [
+          "$l_shipdate",
+          {
+            $dateAdd: {
+              startDate: ISODate("1994-01-01"),
+              unit: "year",
+              amount: 1,
+            },
+          },
+        ],
+      },
+      l_discount: {
+        $gte: 0.08 - 0.01,
+        $lte: 0.08 + 0.01,
+      },
+      l_quantity: {
+        $lt: 24,
+      },
+    },
+  },
+  {
+    $group: {
+      _id: null,
+      revenue: {
+        $sum: {
+          $multiply: [
+            "$l_extendedprice",
+            "$l_discount",
+          ],
+        },
+      },
+    },
+  },
+]);

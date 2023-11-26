@@ -1,0 +1,61 @@
+db.customer.aggregate([
+  {
+    $lookup: {
+      from: "order",
+      localField: "c_custkey",
+      foreignField: "o_custkey",
+      as: "orders",
+    },
+  },
+  {
+    $unwind: {
+      path: "$orders",
+      preserveNullAndEmptyArrays: true,
+    },
+  },
+  {
+    $match: {
+      $or: [
+        {
+          "orders.o_comment": {
+            $not: /express|packages/,
+          },
+        },
+        {
+          orders: {
+            $exists: false,
+          },
+        },
+      ],
+    },
+  },
+  {
+    $group: {
+      _id: "$c_custkey",
+      c_count: {
+        $sum: 1,
+      },
+    },
+  },
+  {
+    $group: {
+      _id: "$c_count",
+      custdist: {
+        $sum: 1,
+      },
+    },
+  },
+  {
+    $sort: {
+      custdist: -1,
+      _id: -1,
+    },
+  },
+  {
+    $project: {
+      _id: 0,
+      c_count: "$_id",
+      custdist: 1,
+    },
+  },
+]);

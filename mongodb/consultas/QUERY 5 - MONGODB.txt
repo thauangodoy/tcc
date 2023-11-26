@@ -1,0 +1,165 @@
+db.customer.aggregate([
+  {
+    $lookup: {
+      from: "order",
+      let: {
+        custkey: "$c_custkey",
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $eq: ["$o_custkey", "$$custkey"],
+            },
+          },
+        },
+        {
+          $match: {
+            o_orderdate: {
+              $gte: new Date("1994-01-01"),
+              $lt: new Date("1995-01-01"),
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: "lineitem",
+            let: {
+              orderkey: "$o_orderkey",
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $eq: [
+                      "$l_orderkey",
+                      "$$orderkey",
+                    ],
+                  },
+                },
+              },
+              {
+                $lookup: {
+                  from: "supplier",
+                  let: {
+                    suppkey: "$l_suppkey",
+                  },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: {
+                          $eq: [
+                            "$s_suppkey",
+                            "$$suppkey",
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      $lookup: {
+                        from: "nation",
+                        let: {
+                          nationkey:
+                            "$s_nationkey",
+                        },
+                        pipeline: [
+                          {
+                            $match: {
+                              $expr: {
+                                $eq: [
+                                  "$n_nationkey",
+                                  "$$nationkey",
+                                ],
+                              },
+                            },
+                          },
+                          {
+                            $lookup: {
+                              from: "region",
+                              let: {
+                                regionkey:
+                                  "$n_regionkey",
+                              },
+                              pipeline: [
+                                {
+                                  $match: {
+                                    $expr: {
+                                      $eq: [
+                                        "$r_regionkey",
+                                        "$$regionkey",
+                                      ],
+                                    },
+                                  },
+                                },
+                                {
+                                  $match: {
+                                    r_name:
+                                      "MIDDLE EAST",
+                                  },
+                                },
+                              ],
+                              as: "region",
+                            },
+                          },
+                          {
+                            $unwind: "$region",
+                          },
+                        ],
+                        as: "nation",
+                      },
+                    },
+                    {
+                      $unwind: "$nation",
+                    },
+                  ],
+                  as: "supplier",
+                },
+              },
+              {
+                $unwind: "$supplier",
+              },
+            ],
+            as: "lineitems",
+          },
+        },
+        {
+          $unwind: "$lineitems",
+        },
+      ],
+      as: "orders",
+    },
+  },
+  {
+    $unwind: "$orders",
+  },
+  {
+    $project: {
+      n_name:
+        "$orders.lineitems.supplier.nation.n_name",
+      lineitem_revenue: {
+        $multiply: [
+          "$orders.lineitems.l_extendedprice",
+          {
+            $subtract: [
+              1,
+              "$orders.lineitems.l_discount",
+            ],
+          },
+        ],
+      },
+    },
+  },
+  {
+    $group: {
+      _id: "$n_name",
+      total_revenue: {
+        $sum: "$lineitem_revenue",
+      },
+    },
+  },
+  {
+    $sort: {
+      total_revenue: -1,
+    },
+  },
+]);

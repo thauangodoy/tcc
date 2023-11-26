@@ -1,0 +1,109 @@
+db.customer.aggregate([
+  {
+    $facet: {
+      averageBalance: [
+        {
+          $match: {
+            c_acctbal: {
+              $gt: 0,
+            },
+            c_phone: {
+              $regex: /^(30|24|31|38|25|34|37)/,
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            avgBalance: {
+              $avg: "$c_acctbal",
+            },
+          },
+        },
+      ],
+      data: [
+        {
+          $match: {
+            c_phone: {
+              $regex: /^(30|24|31|38|25|34|37)/,
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: "order",
+            localField: "c_custkey",
+            foreignField: "o_custkey",
+            as: "orders",
+          },
+        },
+        {
+          $match: {
+            orders: {
+              $size: 0,
+            },
+          },
+        },
+        {
+          $project: {
+            cntrycode: {
+              $substrBytes: ["$c_phone", 0, 2],
+            },
+            c_acctbal: 1,
+          },
+        },
+      ],
+    },
+  },
+  {
+    $unwind: "$averageBalance",
+  },
+  {
+    $set: {
+      data: {
+        $filter: {
+          input: "$data",
+          as: "item",
+          cond: {
+            $gt: [
+              "$$item.c_acctbal",
+              "$averageBalance.avgBalance",
+            ],
+          },
+        },
+      },
+    },
+  },
+  {
+    $unwind: "$data",
+  },
+  {
+    $replaceRoot: {
+      newRoot: "$data",
+    },
+  },
+  {
+    $group: {
+      _id: "$cntrycode",
+      numcust: {
+        $sum: 1,
+      },
+      totacctbal: {
+        $sum: "$c_acctbal",
+      },
+    },
+  },
+  {
+    $sort: {
+      _id: 1,
+    },
+  },
+  {
+    $project: {
+      cntrycode: "$_id",
+      numcust: 1,
+      totacctbal: 1,
+      _id: 0,
+    },
+  },
+]);

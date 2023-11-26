@@ -1,0 +1,145 @@
+db.lineitem.aggregate([
+  {
+    $match: {
+      l_shipmode: {
+        $in: ["FOB", "SHIP"],
+      },
+      $expr: {
+        $lt: ["$l_commitdate", "$l_receiptdate"],
+      },
+      $expr: {
+        $lt: ["$l_shipdate", "$l_commitdate"],
+      },
+      l_receiptdate: {
+        $gte: ISODate("1994-01-01"),
+      },
+      $expr: {
+        $lte: [
+          "$l_receiptdate",
+          {
+            $dateAdd: {
+              startDate: ISODate("1994-01-01"),
+              unit: "year",
+              amount: 1,
+            },
+          },
+        ],
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "order",
+      localField: "l_orderkey",
+      foreignField: "o_orderkey",
+      as: "order",
+    },
+  },
+  {
+    $unwind: {
+      path: "$order",
+    },
+  },
+  {
+    $group: {
+      _id: {
+        l_shipmode: "$l_shipmode",
+      },
+      high_line_count: {
+        $sum: {
+          $cond: {
+            if: {
+              $in: [
+                "$order.o_orderpriority",
+                ["1-URGENT", "2-HIGH"],
+              ],
+            },
+            then: 1,
+            else: 0,
+          },
+        },
+      },
+      low_line_count: {[
+  {
+    $match: {
+      l_shipmode: {
+        $in: ["FOB", "SHIP"],
+      },
+      $expr: {
+        $lt: ["$l_commitdate", "$l_receiptdate"],
+      },
+      $expr: {
+        $lt: ["$l_shipdate", "$l_commitdate"],
+      },
+      l_receiptdate: {
+        $gte: ISODate("1994-01-01"),
+      },
+      $expr: {
+        $lte: [
+          "$l_receiptdate",
+          {
+            $dateAdd: {
+              startDate: ISODate("1994-01-01"),
+              unit: "year",
+              amount: 1,
+            },
+          },
+        ],
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "order",
+      localField: "l_orderkey",
+      foreignField: "o_orderkey",
+      as: "order",
+    },
+  },
+  {
+    $unwind: {
+      path: "$order",
+    },
+  },
+  {
+    $group: {
+      _id: {
+        l_shipmode: "$l_shipmode",
+      },
+      high_line_count: {
+        $sum: {
+          $cond: {
+            if: {
+              $in: [
+                "$order.o_orderpriority",
+                ["1-URGENT", "2-HIGH"],
+              ],
+            },
+            then: 1,
+            else: 0,
+          },
+        },
+      },
+      low_line_count: {
+        $sum: {
+          $cond: {
+            if: {
+              $not: {
+                $in: [
+                  "$order.o_orderpriority",
+                  ["1-URGENT", "2-HIGH"],
+                ],
+              },
+            },
+            then: 1,
+            else: 0,
+          },
+        },
+      },
+    },
+  },
+]
+      },
+    },
+  },
+]);

@@ -1,0 +1,90 @@
+db.lineitem.aggregate([
+  {
+    $match: {
+      p_size: 38,
+      p_type: {
+        $regex: "^.*TIN$",
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "partsupp",
+      localField: "p_partkey",
+      foreignField: "ps_partkey",
+      as: "ps",
+    },
+  },
+  {
+    $unwind: {
+      path: "$ps",
+    },
+  },
+  {
+    $lookup: {
+      from: "supplier",
+      localField: "ps.ps_suppkey",
+      foreignField: "s_suppkey",
+      as: "s",
+    },
+  },
+  {
+    $unwind: {
+      path: "$s",
+    },
+  },
+  {
+    $lookup: {
+      from: "nation",
+      localField: "s.s_nationkey",
+      foreignField: "n_nationkey",
+      as: "n",
+    },
+  },
+  {
+    $unwind: {
+      path: "$n",
+    },
+  },
+  {
+    $lookup: {
+      from: "region",
+      localField: "n.n_regionkey",
+      foreignField: "r_regionkey",
+      as: "r",
+    },
+  },
+  {
+    $unwind: {
+      path: "$r",
+    },
+  },
+  {
+    $match: {
+      "r.r_name": "MIDDLE EAST",
+    },
+  },
+  {
+    $project: {
+      "s.s_acctbal": 1,
+      "s.s_name": 1,
+      "n.n_name": 1,
+      p_partkey: 1,
+      p_mfgr: 1,
+      "s.s_address": 1,
+      "s.s_phone": 1,
+      "s.s_comment": 1,
+      minSupply: {
+        $min: "$ps.ps_supplycost",
+      },
+    },
+  },
+  {
+    $sort: {
+      "s.s_acctbal": -1,
+      "n.n_name": 1,
+      "s.s_name": 1,
+      "p.p_partkey": 1,
+    },
+  },
+]);

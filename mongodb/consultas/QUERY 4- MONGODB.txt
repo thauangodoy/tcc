@@ -1,0 +1,68 @@
+db.order.aggregate([
+  {
+    $match: {
+      o_orderdate: {
+        $gte: new Date("1997-07-01T00:00:00Z"),
+        $lt: new Date("1997-10-01T00:00:00Z"),
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "lineitem",
+      let: {
+        order_key: "$o_orderkey",
+      },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $and: [
+                {
+                  $eq: [
+                    "$l_orderkey",
+                    "$$order_key",
+                  ],
+                },
+                {
+                  $lt: [
+                    "$l_commitdate",
+                    "$l_receiptdate",
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+      as: "matching_lineitems",
+    },
+  },
+  {
+    $match: {
+      "matching_lineitems.0": {
+        $exists: true,
+      },
+    },
+  },
+  {
+    $group: {
+      _id: "$o_orderpriority",
+      order_count: {
+        $sum: 1,
+      },
+    },
+  },
+  {
+    $sort: {
+      _id: 1,
+    },
+  },
+  {
+    $project: {
+      o_orderpriority: "$_id",
+      order_count: 1,
+      _id: 0,
+    },
+  },
+]);

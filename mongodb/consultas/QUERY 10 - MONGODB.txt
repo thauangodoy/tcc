@@ -1,0 +1,99 @@
+db.order.aggregate([
+  {
+    $match: {
+      o_orderdate: {
+        $gte: ISODate("1994-01-01"),
+      },
+      $expr: {
+        $lt: [
+          "$o_orderdate",
+          {
+            $dateAdd: {
+              startDate: ISODate("1994-01-01"),
+              unit: "month",
+              amount: 3,
+            },
+          },
+        ],
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "lineitem",
+      localField: "o_orderkey",
+      foreignField: "l_orderkey",
+      as: "lineitem",
+    },
+  },
+  {
+    $unwind: {
+      path: "$lineitem",
+    },
+  },
+  {
+    $match: {
+      "lineitem.l_returnflag": "R",
+    },
+  },
+  {
+    $lookup: {
+      from: "customer",
+      localField: "o_custkey",
+      foreignField: "c_custkey",
+      as: "customer",
+    },
+  },
+  {
+    $unwind: {
+      path: "$customer",
+    },
+  },
+  {
+    $lookup: {
+      from: "nation",
+      localField: "customer.c_nationkey",
+      foreignField: "n_nationkey",
+      as: "nation",
+    },
+  },
+  {
+    $unwind: {
+      path: "$nation",
+    },
+  },
+  {
+    $group: {
+      _id: {
+        custkey: "$customer.c_custkey",
+        cname: "$customer.c_name",
+        cacctbal: "$customer.c_acctbal",
+        cphone: "$customer.c_phone",
+        nname: "$nation.n_name",
+        caddres: "$customer.c_address",
+        ccomment: "$customer.c_comment",
+      },
+      revenue: {
+        $sum: {
+          $multiply: [
+            "$lineitem.l_extendedprice",
+            {
+              $subtract: [
+                1,
+                "$lineitem.l_discount",
+              ],
+            },
+          ],
+        },
+      },
+    },
+  },
+  {
+    $sort: {
+      revenue: -1,
+    },
+  },
+  {
+    $limit: 20,
+  },
+]);
